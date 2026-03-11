@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Upload, X } from "lucide-react";
 import { generateSlotStarts } from "@/lib/time-slots";
+import ParticipantInput from "@/components/participant-input";
 
 interface RangeOption {
   id: string;
@@ -34,8 +35,8 @@ export default function NewMeeting() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [duration, setDuration] = useState(60);
-  const [requiredEmails, setRequiredEmails] = useState("");
-  const [optionalEmails, setOptionalEmails] = useState("");
+  const [requiredEmails, setRequiredEmails] = useState<string[]>([]);
+  const [optionalEmails, setOptionalEmails] = useState<string[]>([]);
   const [additionalContext, setAdditionalContext] = useState("");
   const [linkedInUrl, setLinkedInUrl] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -105,14 +106,8 @@ export default function NewMeeting() {
           title,
           description,
           duration,
-          requiredEmails: requiredEmails
-            .split(/[,;\n]/)
-            .map((e) => e.trim())
-            .filter(Boolean),
-          optionalEmails: optionalEmails
-            .split(/[,;\n]/)
-            .map((e) => e.trim())
-            .filter(Boolean),
+          requiredEmails,
+          optionalEmails,
           additionalContext,
           linkedInUrl,
           imageUrl,
@@ -287,13 +282,11 @@ export default function NewMeeting() {
           <label className="block text-sm font-medium text-stone-700 mb-1.5">
             Required Participants <span className="text-red-500">*</span>
           </label>
-          <textarea
+          <ParticipantInput
+            emails={requiredEmails}
+            onChange={setRequiredEmails}
+            placeholder="Type a name or email..."
             required
-            value={requiredEmails}
-            onChange={(e) => setRequiredEmails(e.target.value)}
-            placeholder="Enter email addresses, separated by commas or new lines"
-            rows={2}
-            className="w-full px-4 py-2.5 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none text-sm"
           />
         </div>
 
@@ -302,12 +295,10 @@ export default function NewMeeting() {
           <label className="block text-sm font-medium text-stone-700 mb-1.5">
             Optional Participants
           </label>
-          <textarea
-            value={optionalEmails}
-            onChange={(e) => setOptionalEmails(e.target.value)}
-            placeholder="Enter email addresses, separated by commas or new lines"
-            rows={2}
-            className="w-full px-4 py-2.5 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none text-sm"
+          <ParticipantInput
+            emails={optionalEmails}
+            onChange={setOptionalEmails}
+            placeholder="Type a name or email..."
           />
         </div>
 
