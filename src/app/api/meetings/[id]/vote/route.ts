@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { sendCompletionEmail } from "@/lib/email";
+import { sendCompletionEmail, sendVoteReceivedEmail } from "@/lib/email";
 
 export async function POST(
   req: NextRequest,
@@ -73,13 +73,27 @@ export async function POST(
     },
   });
 
-  if (meeting) {
+  if (meeting && meeting.creator.email) {
     const requiredParticipants = meeting.participants.filter(
       (p) => p.type === "REQUIRED"
     );
-    const allRequiredVoted = requiredParticipants.every((p) => p.hasVoted);
+    const votedCount = requiredParticipants.filter((p) => p.hasVoted).length;
+    const allRequiredVoted = votedCount === requiredParticipants.length;
 
-    if (allRequiredVoted && meeting.creator.email) {
+    const voterName = session.user.name || session.user.email;
+
+    // Notify creator that someone voted
+    sendVoteReceivedEmail(
+      meeting.creator.email,
+      meeting.title,
+      voterName,
+      votedCount,
+      requiredParticipants.length,
+      meeting.id
+    ).catch(console.error);
+
+    // Notify creator that all required votes are in
+    if (allRequiredVoted) {
       sendCompletionEmail(
         meeting.creator.email,
         meeting.title,

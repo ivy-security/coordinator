@@ -70,6 +70,37 @@ export async function sendCompletionEmail(
   });
 }
 
+export async function sendVoteReceivedEmail(
+  to: string,
+  meetingTitle: string,
+  voterName: string,
+  votedCount: number,
+  totalRequired: number,
+  meetingId: string
+) {
+  const meetingUrl = `${APP_URL}/meetings/${meetingId}`;
+
+  await getResend().emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject: `${voterName} voted on: ${meetingTitle} (${votedCount}/${totalRequired})`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #5F8727; padding: 24px; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">Meeting Coordinator</h1>
+        </div>
+        <div style="padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+          <p><strong>${voterName}</strong> has voted on <strong>${meetingTitle}</strong>.</p>
+          <p style="color: #6b7280;">${votedCount} of ${totalRequired} required participants have voted.</p>
+          <a href="${meetingUrl}" style="display: inline-block; background: #5F8727; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">
+            View Progress
+          </a>
+        </div>
+      </div>
+    `,
+  });
+}
+
 export async function sendFinalizedEmail(
   to: string,
   meetingTitle: string,
