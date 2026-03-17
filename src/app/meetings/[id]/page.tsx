@@ -15,8 +15,10 @@ import {
   Link as LinkIcon,
   ExternalLink,
   Ban,
+  Trash2,
 } from "lucide-react";
 import { generateSlotStarts } from "@/lib/time-slots";
+import DismissButton from "@/components/dismiss-button";
 
 interface AvailabilityRecord {
   userId: string;
@@ -44,7 +46,7 @@ interface Meeting {
   title: string;
   description: string | null;
   duration: number;
-  status: "ACTIVE" | "COMPLETED" | "CANCELLED";
+  status: "ACTIVE" | "COMPLETED" | "CANCELLED" | "DISMISSED";
   shareToken: string;
   additionalContext: string | null;
   linkedInUrl: string | null;
@@ -207,6 +209,7 @@ export default function MeetingDetail() {
     setMeeting((prev) => (prev ? { ...prev, status: "CANCELLED" } : null));
   };
 
+
   return (
     <div className="max-w-3xl mx-auto">
       {/* Header */}
@@ -222,17 +225,7 @@ export default function MeetingDetail() {
               {meeting.duration} min meeting
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {meeting.status === "ACTIVE" && (
-              <button
-                onClick={cancel}
-                className="flex items-center gap-1.5 text-sm text-stone-400 hover:text-red-500 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-50"
-              >
-                <Ban className="w-3.5 h-3.5" />
-                Cancel
-              </button>
-            )}
-          </div>
+          <DismissButton meetingId={meeting.id} meetingTitle={meeting.title} variant="text" />
         </div>
 
         {meeting.status === "COMPLETED" && meeting.finalizedStart && meeting.finalizedEnd && (

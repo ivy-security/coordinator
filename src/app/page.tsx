@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { Calendar, Plus, Users, Clock, ArrowRight, CheckCircle2, XCircle } from "lucide-react";
+import DismissButton from "@/components/dismiss-button";
 
 export default async function Home() {
   const session = await auth();
@@ -11,7 +12,7 @@ export default async function Home() {
   }
 
   const meetings = await prisma.meeting.findMany({
-    where: { creatorId: session.user!.id },
+    where: { creatorId: session.user!.id, status: { in: ["ACTIVE", "COMPLETED", "CANCELLED"] } },
     include: {
       timeOptions: true,
       participants: true,
@@ -21,32 +22,16 @@ export default async function Home() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-stone-900">Your Meetings</h1>
-          <p className="text-stone-500 mt-1">Manage and track your meeting coordination</p>
-        </div>
-        <Link
-          href="/meetings/new"
-          className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-lg hover:bg-primary-dark transition-colors font-medium"
-        >
-          <Plus className="w-4 h-4" />
-          New Meeting
-        </Link>
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-stone-900">Your Meetings</h1>
+        <p className="text-stone-500 mt-1">Manage and track your meeting coordination</p>
       </div>
 
       {meetings.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-stone-200">
           <Calendar className="w-12 h-12 text-stone-300 mx-auto mb-4" />
           <h2 className="text-lg font-medium text-stone-600 mb-2">No meetings yet</h2>
-          <p className="text-stone-400 mb-6">Create your first meeting to start coordinating</p>
-          <Link
-            href="/meetings/new"
-            className="inline-flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-lg hover:bg-primary-dark transition-colors font-medium"
-          >
-            <Plus className="w-4 h-4" />
-            Create Meeting
-          </Link>
+          <p className="text-stone-400">Create your first meeting to start coordinating</p>
         </div>
       ) : (
         <div className="grid gap-4">
@@ -58,12 +43,15 @@ export default async function Home() {
             const allVoted = requiredParticipants.length > 0 && votedCount === requiredParticipants.length;
 
             return (
-              <Link
+              <div
                 key={meeting.id}
-                href={`/meetings/${meeting.id}`}
-                className="bg-white rounded-xl border border-stone-200 p-6 hover:border-primary/30 hover:shadow-sm transition-all group"
+                className="bg-white rounded-xl border border-stone-200 p-6 hover:border-primary/30 hover:shadow-sm transition-all group relative"
               >
-                <div className="flex items-start justify-between">
+                <Link
+                  href={`/meetings/${meeting.id}`}
+                  className="absolute inset-0 rounded-xl"
+                />
+                <div className="flex items-start justify-between relative">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h2 className="text-lg font-semibold text-stone-900 group-hover:text-primary transition-colors">
@@ -90,9 +78,11 @@ export default async function Home() {
                       </span>
                     </div>
                   </div>
-                  <ArrowRight className="w-5 h-5 text-stone-300 group-hover:text-primary transition-colors mt-1" />
+                  <div className="relative z-10">
+                    <DismissButton meetingId={meeting.id} meetingTitle={meeting.title} variant="text" />
+                  </div>
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>

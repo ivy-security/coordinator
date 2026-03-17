@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Upload, X } from "lucide-react";
 import { generateSlotStarts } from "@/lib/time-slots";
@@ -44,6 +44,16 @@ export default function NewMeeting() {
   const [ranges, setRanges] = useState<RangeOption[]>([
     { id: "1", date: "", startTime: "09:00", endTime: "17:00" },
   ]);
+
+  // Pre-populate required participants with all other registered users
+  useEffect(() => {
+    fetch("/api/users")
+      .then((res) => res.json())
+      .then((users: { email: string }[]) => {
+        setRequiredEmails(users.map((u) => u.email));
+      })
+      .catch(() => {});
+  }, []);
 
   const addRange = () => {
     setRanges([

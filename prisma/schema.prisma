@@ -79,6 +79,7 @@ enum MeetingStatus {
   ACTIVE
   COMPLETED
   CANCELLED
+  DISMISSED
 }
 
 model TimeOption {

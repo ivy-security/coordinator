@@ -88,6 +88,20 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // Record creator's availability — all slots in each range they defined
+  await prisma.$transaction(
+    meeting.timeOptions.map((to) => {
+      const slots = generateSlotStarts(to.startTime, to.endTime, duration);
+      return prisma.availability.create({
+        data: {
+          userId: session.user!.id!,
+          rangeId: to.id,
+          slots,
+        },
+      });
+    })
+  );
+
   // Send invite emails (fire and forget)
   const allEmails = [...requiredEmails, ...(optionalEmails || [])];
   for (const email of allEmails) {

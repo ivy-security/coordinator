@@ -53,9 +53,15 @@ export async function PATCH(
   }
 
   const body = await req.json();
+  const allowedStatuses = ["ACTIVE", "COMPLETED", "CANCELLED", "DISMISSED"];
+  const data: Record<string, unknown> = {};
+  if (body.status && allowedStatuses.includes(body.status)) {
+    data.status = body.status;
+  }
+
   const updated = await prisma.meeting.update({
     where: { id },
-    data: body,
+    data,
   });
 
   return NextResponse.json(updated);
