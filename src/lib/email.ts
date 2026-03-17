@@ -126,3 +126,90 @@ export async function sendFinalizedEmail(
     `,
   });
 }
+
+export async function sendMeetingCreatedEmail(
+  to: string,
+  meetingTitle: string,
+  meetingId: string,
+  participantCount: number
+) {
+  const meetingUrl = `${APP_URL}/meetings/${meetingId}`;
+
+  await getResend().emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject: `Meeting created: ${meetingTitle} — waiting for votes`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #5F8727; padding: 24px; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">Meeting Coordinator</h1>
+        </div>
+        <div style="padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+          <p>Your meeting <strong>${meetingTitle}</strong> has been created.</p>
+          <p>Invites have been sent to ${participantCount} participant${participantCount !== 1 ? "s" : ""}. You'll be notified as votes come in.</p>
+          <a href="${meetingUrl}" style="display: inline-block; background: #5F8727; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">
+            View Meeting
+          </a>
+        </div>
+      </div>
+    `,
+  });
+}
+
+export async function sendMeetingEditedEmail(
+  to: string,
+  meetingTitle: string,
+  organizerName: string,
+  shareToken: string
+) {
+  const voteUrl = `${APP_URL}/vote/${shareToken}`;
+
+  await getResend().emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject: `Meeting updated: ${meetingTitle}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #5F8727; padding: 24px; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">Meeting Coordinator</h1>
+        </div>
+        <div style="padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+          <p><strong>${organizerName}</strong> has updated the meeting <strong>${meetingTitle}</strong>.</p>
+          <p>The meeting details or time ranges have changed. You can review and vote on the updated options.</p>
+          <a href="${voteUrl}" style="display: inline-block; background: #5F8727; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">
+            Review &amp; Vote
+          </a>
+        </div>
+      </div>
+    `,
+  });
+}
+
+export async function sendRevoteRequiredEmail(
+  to: string,
+  meetingTitle: string,
+  organizerName: string,
+  shareToken: string
+) {
+  const voteUrl = `${APP_URL}/vote/${shareToken}`;
+
+  await getResend().emails.send({
+    from: FROM_EMAIL,
+    to,
+    subject: `Action required: Please re-vote on ${meetingTitle}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #5F8727; padding: 24px; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">Meeting Coordinator</h1>
+        </div>
+        <div style="padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+          <p><strong>${organizerName}</strong> has made changes to <strong>${meetingTitle}</strong> that affect your previous vote.</p>
+          <p>Your vote has been reset and you need to vote again on the updated time options.</p>
+          <a href="${voteUrl}" style="display: inline-block; background: #d97706; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">
+            Re-vote Now
+          </a>
+        </div>
+      </div>
+    `,
+  });
+}

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { nanoid } from "nanoid";
-import { sendInviteEmail } from "@/lib/email";
+import { sendInviteEmail, sendMeetingCreatedEmail } from "@/lib/email";
 import { generateSlotStarts } from "@/lib/time-slots";
 
 export async function POST(req: NextRequest) {
@@ -102,13 +102,24 @@ export async function POST(req: NextRequest) {
     })
   );
 
-  // Send invite emails (fire and forget)
-  const allEmails = [...requiredEmails, ...(optionalEmails || [])];
+  // Send invite emails to participants (exclude organizer)
+  const organizerEmail = session.user.email!.toLowerCase();
+  const allEmails = [...requiredEmails, ...(optionalEmails || [])]
+    .map((e: string) => e.toLowerCase())
+    .filter((e: string) => e !== organizerEmail);
   for (const email of allEmails) {
     sendInviteEmail(email, title, session.user.name || "Someone", shareToken).catch(
       console.error
     );
   }
+
+  // Notify organizer that meeting is created and pending votes
+  sendMeetingCreatedEmail(
+    organizerEmail,
+    title,
+    meeting.id,
+    allEmails.length
+  ).catch(console.error);
 
   return NextResponse.json(meeting);
 }

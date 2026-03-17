@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateSlotStarts } from "@/lib/time-slots";
+import { sendMeetingEditedEmail, sendRevoteRequiredEmail } from "@/lib/email";
 
 export async function GET(
   req: NextRequest,
@@ -289,6 +290,32 @@ export async function PUT(
       }
     }
   });
+
+  // Send emails after transaction completes
+  const organizerName = session.user.name || session.user.email || "Someone";
+  const organizerEmail = session.user.email!.toLowerCase();
+
+  // All current participant emails (excluding organizer)
+  const allParticipantEmails = [
+    ...requiredEmails.map((e: string) => e.toLowerCase()),
+    ...(optionalEmails || []).map((e: string) => e.toLowerCase()),
+  ].filter((e: string) => e !== organizerEmail);
+
+  // Rule 6: Send revote emails to voided participants (excluding organizer)
+  const voidedNonOrganizer = Array.from(voidedParticipantEmails).filter(
+    (e) => e !== organizerEmail
+  );
+  for (const email of voidedNonOrganizer) {
+    sendRevoteRequiredEmail(email, title, organizerName, meeting.shareToken).catch(console.error);
+  }
+
+  // Rule 5: Send update to all non-voided participants (they weren't already notified above)
+  const nonVoidedParticipants = allParticipantEmails.filter(
+    (e: string) => !voidedParticipantEmails.has(e)
+  );
+  for (const email of nonVoidedParticipants) {
+    sendMeetingEditedEmail(email, title, organizerName, meeting.shareToken).catch(console.error);
+  }
 
   return NextResponse.json({ success: true });
 }
