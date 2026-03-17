@@ -20,19 +20,22 @@ export default async function Home() {
     orderBy: { createdAt: "desc" },
   });
 
-  const invitedMeetings = await prisma.meeting.findMany({
-    where: {
-      participants: { some: { email: session.user!.email!.toLowerCase() } },
-      creatorId: { not: session.user!.id },
-      status: { in: ["ACTIVE", "COMPLETED", "CANCELLED"] },
-    },
-    include: {
-      timeOptions: true,
-      participants: true,
-      creator: { select: { name: true, email: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const userEmail = session.user?.email?.toLowerCase();
+  const invitedMeetings = userEmail
+    ? await prisma.meeting.findMany({
+        where: {
+          participants: { some: { email: userEmail } },
+          creatorId: { not: session.user!.id },
+          status: { in: ["ACTIVE", "COMPLETED", "CANCELLED"] },
+        },
+        include: {
+          timeOptions: true,
+          participants: true,
+          creator: { select: { name: true, email: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
 
   const noMeetings = myMeetings.length === 0 && invitedMeetings.length === 0;
 
