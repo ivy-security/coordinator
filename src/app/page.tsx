@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { Calendar, Plus, Users, Clock, ArrowRight, CheckCircle2, XCircle } from "lucide-react";
+import { Calendar, Plus, Users, Clock, CheckCircle2, XCircle, Pencil } from "lucide-react";
 import DismissButton from "@/components/dismiss-button";
 
 export default async function Home() {
@@ -11,7 +11,7 @@ export default async function Home() {
     return <LandingPage />;
   }
 
-  const meetings = await prisma.meeting.findMany({
+  const myMeetings = await prisma.meeting.findMany({
     where: { creatorId: session.user!.id, status: { in: ["ACTIVE", "COMPLETED", "CANCELLED"] } },
     include: {
       timeOptions: true,
@@ -20,6 +20,22 @@ export default async function Home() {
     orderBy: { createdAt: "desc" },
   });
 
+  const invitedMeetings = await prisma.meeting.findMany({
+    where: {
+      participants: { some: { email: session.user!.email!.toLowerCase() } },
+      creatorId: { not: session.user!.id },
+      status: { in: ["ACTIVE", "COMPLETED", "CANCELLED"] },
+    },
+    include: {
+      timeOptions: true,
+      participants: true,
+      creator: { select: { name: true, email: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const noMeetings = myMeetings.length === 0 && invitedMeetings.length === 0;
+
   return (
     <div>
       <div className="mb-8">
@@ -27,66 +43,117 @@ export default async function Home() {
         <p className="text-stone-500 mt-1">Manage and track your meeting coordination</p>
       </div>
 
-      {meetings.length === 0 ? (
+      {noMeetings ? (
         <div className="text-center py-16 bg-white rounded-xl border border-stone-200">
           <Calendar className="w-12 h-12 text-stone-300 mx-auto mb-4" />
           <h2 className="text-lg font-medium text-stone-600 mb-2">No meetings yet</h2>
           <p className="text-stone-400">Create your first meeting to start coordinating</p>
         </div>
       ) : (
-        <div className="grid gap-4">
-          {meetings.map((meeting) => {
-            const requiredParticipants = meeting.participants.filter(
-              (p) => p.type === "REQUIRED"
-            );
-            const votedCount = requiredParticipants.filter((p) => p.hasVoted).length;
-            const allVoted = requiredParticipants.length > 0 && votedCount === requiredParticipants.length;
-
-            return (
-              <div
-                key={meeting.id}
-                className="bg-white rounded-xl border border-stone-200 p-6 hover:border-primary/30 hover:shadow-sm transition-all group relative"
-              >
-                <Link
-                  href={`/meetings/${meeting.id}`}
-                  className="absolute inset-0 rounded-xl"
-                />
-                <div className="flex items-start justify-between relative">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h2 className="text-lg font-semibold text-stone-900 group-hover:text-primary transition-colors">
-                        {meeting.title}
-                      </h2>
-                      <StatusBadge status={meeting.status} allVoted={allVoted} />
-                    </div>
-                    {meeting.description && (
-                      <p className="text-stone-500 text-sm mb-3 line-clamp-2">
-                        {meeting.description}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-4 text-sm text-stone-400">
-                      <span className="flex items-center gap-1">
-                        <Users className="w-3.5 h-3.5" />
-                        {meeting.participants.length} participant{meeting.participants.length !== 1 ? "s" : ""}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        {meeting.duration} min &middot; {meeting.timeOptions.length} range{meeting.timeOptions.length !== 1 ? "s" : ""}
-                      </span>
-                      <span>
-                        {votedCount}/{requiredParticipants.length} required voted
-                      </span>
-                    </div>
-                  </div>
-                  <div className="relative z-10">
-                    <DismissButton meetingId={meeting.id} meetingTitle={meeting.title} variant="text" />
-                  </div>
-                </div>
+        <>
+          {myMeetings.length > 0 && (
+            <div className="mb-8">
+              {invitedMeetings.length > 0 && (
+                <h2 className="text-sm font-medium text-stone-500 uppercase tracking-wide mb-3">Organized by you</h2>
+              )}
+              <div className="grid gap-4">
+                {myMeetings.map((meeting) => (
+                  <MeetingCard key={meeting.id} meeting={meeting} isOrganizer />
+                ))}
               </div>
-            );
-          })}
-        </div>
+            </div>
+          )}
+
+          {invitedMeetings.length > 0 && (
+            <div>
+              <h2 className="text-sm font-medium text-stone-500 uppercase tracking-wide mb-3">Invited</h2>
+              <div className="grid gap-4">
+                {invitedMeetings.map((meeting) => (
+                  <MeetingCard
+                    key={meeting.id}
+                    meeting={meeting}
+                    isOrganizer={false}
+                    organizerName={meeting.creator.name || meeting.creator.email}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
+    </div>
+  );
+}
+
+function MeetingCard({
+  meeting,
+  isOrganizer,
+  organizerName,
+}: {
+  meeting: {
+    id: string;
+    title: string;
+    description: string | null;
+    duration: number;
+    status: string;
+    timeOptions: { id: string }[];
+    participants: { type: string; hasVoted: boolean }[];
+  };
+  isOrganizer: boolean;
+  organizerName?: string;
+}) {
+  const requiredParticipants = meeting.participants.filter((p) => p.type === "REQUIRED");
+  const votedCount = requiredParticipants.filter((p) => p.hasVoted).length;
+  const allVoted = requiredParticipants.length > 0 && votedCount === requiredParticipants.length;
+
+  return (
+    <div className="bg-white rounded-xl border border-stone-200 p-6 hover:border-primary/30 hover:shadow-sm transition-all group relative">
+      <Link href={`/meetings/${meeting.id}`} className="absolute inset-0 rounded-xl" />
+      <div className="flex items-start justify-between relative">
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-2">
+            <h2 className="text-lg font-semibold text-stone-900 group-hover:text-primary transition-colors">
+              {meeting.title}
+            </h2>
+            <StatusBadge status={meeting.status} allVoted={allVoted} />
+          </div>
+          {organizerName && (
+            <p className="text-xs text-stone-400 mb-2">
+              Organized by {organizerName}
+            </p>
+          )}
+          {meeting.description && (
+            <p className="text-stone-500 text-sm mb-3 line-clamp-2">
+              {meeting.description}
+            </p>
+          )}
+          <div className="flex items-center gap-4 text-sm text-stone-400">
+            <span className="flex items-center gap-1">
+              <Users className="w-3.5 h-3.5" />
+              {meeting.participants.length} participant{meeting.participants.length !== 1 ? "s" : ""}
+            </span>
+            <span className="flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5" />
+              {meeting.duration} min &middot; {meeting.timeOptions.length} range{meeting.timeOptions.length !== 1 ? "s" : ""}
+            </span>
+            <span>
+              {votedCount}/{requiredParticipants.length} required voted
+            </span>
+          </div>
+        </div>
+        {isOrganizer && (
+          <div className="relative z-10 flex items-center gap-2">
+            <Link
+              href={`/meetings/${meeting.id}/edit`}
+              className="flex items-center gap-1.5 text-sm text-stone-400 hover:text-primary transition-colors px-3 py-1.5 rounded-lg hover:bg-primary-50"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit
+            </Link>
+            <DismissButton meetingId={meeting.id} meetingTitle={meeting.title} variant="text" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { format } from "date-fns";
 import {
   Calendar,
@@ -16,6 +17,7 @@ import {
   ExternalLink,
   Ban,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import { generateSlotStarts } from "@/lib/time-slots";
 import DismissButton from "@/components/dismiss-button";
@@ -236,7 +238,16 @@ export default function MeetingDetail() {
               {meeting.duration} min meeting
             </div>
           </div>
-          <DismissButton meetingId={meeting.id} meetingTitle={meeting.title} variant="text" />
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/meetings/${meeting.id}/edit`}
+              className="flex items-center gap-1.5 text-sm text-stone-400 hover:text-primary transition-colors px-3 py-1.5 rounded-lg hover:bg-primary-50"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit
+            </Link>
+            <DismissButton meetingId={meeting.id} meetingTitle={meeting.title} variant="text" />
+          </div>
         </div>
 
         {meeting.status === "COMPLETED" && meeting.finalizedStart && meeting.finalizedEnd && (

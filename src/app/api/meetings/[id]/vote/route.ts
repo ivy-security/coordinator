@@ -32,10 +32,6 @@ export async function POST(
     return NextResponse.json({ error: "You are not a participant" }, { status: 403 });
   }
 
-  if (participant.hasVoted) {
-    return NextResponse.json({ error: "You have already voted" }, { status: 400 });
-  }
-
   // Upsert availabilities in a transaction
   await prisma.$transaction([
     // Upsert all availability records
