@@ -62,6 +62,11 @@ interface Meeting {
   participants: Participant[];
 }
 
+interface SlotVoter {
+  email: string;
+  name: string;
+}
+
 interface SlotInfo {
   rangeId: string;
   start: Date;
@@ -69,6 +74,7 @@ interface SlotInfo {
   availableCount: number;
   totalRequired: number;
   availableEmails: string[];
+  availableVoters: SlotVoter[];
 }
 
 export default function MeetingDetail() {
@@ -103,24 +109,36 @@ export default function MeetingDetail() {
         meeting.duration
       );
 
-      // Build a map: email -> Set of slot start ISO strings
-      const emailSlotMap = new Map<string, Set<string>>();
+      // Build a map: email -> { name, slots }
+      const emailSlotMap = new Map<string, { name: string; slots: Set<string> }>();
       for (const avail of range.availabilities) {
         const email = avail.user.email.toLowerCase();
         const slotSet = new Set(
           avail.slots.map((s: string) => new Date(s).toISOString())
         );
-        emailSlotMap.set(email, slotSet);
+        emailSlotMap.set(email, {
+          name: avail.user.name || avail.user.email,
+          slots: slotSet,
+        });
       }
 
       const slots: SlotInfo[] = slotStarts.map((slotStart) => {
         const slotIso = slotStart.toISOString();
         const availableEmails: string[] = [];
+        const availableVoters: SlotVoter[] = [];
 
+        // Count required participants for the ratio
         for (const email of requiredEmails) {
-          const userSlots = emailSlotMap.get(email);
-          if (userSlots?.has(slotIso)) {
+          const userData = emailSlotMap.get(email);
+          if (userData?.slots.has(slotIso)) {
             availableEmails.push(email);
+          }
+        }
+
+        // Collect all voters (including optional and organizer) for display
+        for (const [email, userData] of emailSlotMap) {
+          if (userData.slots.has(slotIso)) {
+            availableVoters.push({ email, name: userData.name });
           }
         }
 
@@ -131,6 +149,7 @@ export default function MeetingDetail() {
           availableCount: availableEmails.length,
           totalRequired: requiredEmails.length,
           availableEmails,
+          availableVoters,
         };
       });
 
@@ -418,16 +437,17 @@ export default function MeetingDetail() {
                     return (
                       <div
                         key={slot.start.toISOString()}
-                        className={`flex items-center justify-between p-3 rounded-lg ${borderClass}`}
+                        className={`p-3 rounded-lg ${borderClass}`}
                       >
-                        <div>
-                          <span className="text-sm font-medium text-stone-900">
-                            {format(slot.start, "h:mm a")} &mdash; {format(slot.end, "h:mm a")}
-                          </span>
-                          <span className={`ml-2 text-xs font-medium ${countColorClass}`}>
-                            {slot.availableCount}/{slot.totalRequired} required available
-                          </span>
-                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-sm font-medium text-stone-900">
+                              {format(slot.start, "h:mm a")} &mdash; {format(slot.end, "h:mm a")}
+                            </span>
+                            <span className={`ml-2 text-xs font-medium ${countColorClass}`}>
+                              {slot.availableCount}/{slot.totalRequired} required available
+                            </span>
+                          </div>
                         <div className="flex items-center gap-2">
                           {isFinalized && (
                             <span className="flex items-center gap-1 text-sm font-medium text-primary">
@@ -445,6 +465,20 @@ export default function MeetingDetail() {
                             </button>
                           )}
                         </div>
+                        </div>
+                        {slot.availableVoters.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {slot.availableVoters.map((voter) => (
+                              <span
+                                key={voter.email}
+                                className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-white/60 text-stone-600"
+                                title={voter.email}
+                              >
+                                {voter.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
