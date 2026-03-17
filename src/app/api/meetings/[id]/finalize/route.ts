@@ -24,7 +24,7 @@ export async function POST(
   }
 
   const body = await req.json();
-  const { slotStart, slotEnd } = body;
+  const { slotStart, slotEnd, title, description, attendees, location, addGoogleMeet } = body;
 
   if (!slotStart || !slotEnd) {
     return NextResponse.json({ error: "slotStart and slotEnd are required" }, { status: 400 });
@@ -32,6 +32,9 @@ export async function POST(
 
   const startTime = new Date(slotStart);
   const endTime = new Date(slotEnd);
+  const eventTitle = title || meeting.title;
+  const eventDescription = description ?? meeting.description;
+  const eventAttendees: string[] = attendees || meeting.participants.map((p) => p.email);
 
   // Update meeting status
   await prisma.meeting.update({
@@ -40,19 +43,21 @@ export async function POST(
       status: "COMPLETED",
       finalizedStart: startTime,
       finalizedEnd: endTime,
+      finalizedAttendees: eventAttendees,
     },
   });
 
   // Create Google Calendar event
-  const attendeeEmails = meeting.participants.map((p) => p.email);
   try {
     await createCalendarEvent(
       session.user.id,
-      meeting.title,
-      meeting.description,
+      eventTitle,
+      eventDescription,
       startTime,
       endTime,
-      attendeeEmails
+      eventAttendees,
+      location,
+      addGoogleMeet
     );
   } catch (error) {
     console.error("Failed to create calendar event:", error);
@@ -61,8 +66,8 @@ export async function POST(
   // Send finalized emails
   const startStr = startTime.toLocaleString();
   const endStr = endTime.toLocaleString();
-  for (const participant of meeting.participants) {
-    sendFinalizedEmail(participant.email, meeting.title, startStr, endStr).catch(
+  for (const email of eventAttendees) {
+    sendFinalizedEmail(email, eventTitle, startStr, endStr).catch(
       console.error
     );
   }

@@ -7,7 +7,9 @@ export async function createCalendarEvent(
   description: string | null,
   startTime: Date,
   endTime: Date,
-  attendeeEmails: string[]
+  attendeeEmails: string[],
+  location?: string,
+  addGoogleMeet?: boolean
 ) {
   const account = await prisma.account.findFirst({
     where: { userId, provider: "google" },
@@ -31,9 +33,11 @@ export async function createCalendarEvent(
 
   const event = await calendar.events.insert({
     calendarId: "primary",
+    conferenceDataVersion: addGoogleMeet ? 1 : 0,
     requestBody: {
       summary: title,
       description: description || undefined,
+      location: location || undefined,
       start: {
         dateTime: startTime.toISOString(),
       },
@@ -41,6 +45,14 @@ export async function createCalendarEvent(
         dateTime: endTime.toISOString(),
       },
       attendees: attendeeEmails.map((email) => ({ email })),
+      ...(addGoogleMeet && {
+        conferenceData: {
+          createRequest: {
+            requestId: crypto.randomUUID(),
+            conferenceSolutionKey: { type: "hangoutsMeet" },
+          },
+        },
+      }),
       reminders: {
         useDefault: true,
       },

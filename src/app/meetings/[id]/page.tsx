@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { generateSlotStarts } from "@/lib/time-slots";
 import DismissButton from "@/components/dismiss-button";
+import ScheduleModal from "@/components/schedule-modal";
 
 interface AvailabilityRecord {
   userId: string;
@@ -53,6 +54,7 @@ interface Meeting {
   imageUrl: string | null;
   finalizedStart: string | null;
   finalizedEnd: string | null;
+  finalizedAttendees: string[];
   creator: { name: string; email: string; image: string | null };
   timeOptions: TimeOption[];
   participants: Participant[];
@@ -72,7 +74,7 @@ export default function MeetingDetail() {
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [finalizing, setFinalizing] = useState(false);
+  const [scheduleSlot, setScheduleSlot] = useState<{ start: Date; end: Date } | null>(null);
   const [sendingInvites, setSendingInvites] = useState(false);
 
   useEffect(() => {
@@ -172,31 +174,40 @@ export default function MeetingDetail() {
     }
   };
 
-  const finalize = async (slotStart: Date, slotEnd: Date) => {
-    setFinalizing(true);
-    try {
-      const res = await fetch(`/api/meetings/${id}/finalize`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          slotStart: slotStart.toISOString(),
-          slotEnd: slotEnd.toISOString(),
-        }),
-      });
-      if (res.ok) {
-        setMeeting((prev) =>
-          prev
-            ? {
-                ...prev,
-                status: "COMPLETED",
-                finalizedStart: slotStart.toISOString(),
-                finalizedEnd: slotEnd.toISOString(),
-              }
-            : null
-        );
-      }
-    } finally {
-      setFinalizing(false);
+  const finalize = async (data: {
+    title: string;
+    description: string;
+    attendees: string[];
+    location: string;
+    addGoogleMeet: boolean;
+  }) => {
+    if (!scheduleSlot) return;
+    const res = await fetch(`/api/meetings/${id}/finalize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        slotStart: scheduleSlot.start.toISOString(),
+        slotEnd: scheduleSlot.end.toISOString(),
+        title: data.title,
+        description: data.description,
+        attendees: data.attendees,
+        location: data.location,
+        addGoogleMeet: data.addGoogleMeet,
+      }),
+    });
+    if (res.ok) {
+      setMeeting((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "COMPLETED",
+              finalizedStart: scheduleSlot.start.toISOString(),
+              finalizedEnd: scheduleSlot.end.toISOString(),
+              finalizedAttendees: data.attendees,
+            }
+          : null
+      );
+      setScheduleSlot(null);
     }
   };
 
@@ -238,9 +249,11 @@ export default function MeetingDetail() {
                 {format(new Date(meeting.finalizedStart), "h:mm a")} to{" "}
                 {format(new Date(meeting.finalizedEnd), "h:mm a")}
               </p>
-              <p className="text-sm text-primary/70 mt-0.5">
-                Calendar invites have been sent to all participants.
-              </p>
+              {meeting.finalizedAttendees.length > 0 && (
+                <p className="text-sm text-primary/70 mt-0.5">
+                  Calendar invite sent to: {meeting.finalizedAttendees.join(", ")}
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -366,26 +379,41 @@ export default function MeetingDetail() {
                 <p className="text-sm text-stone-400 italic">No slots in this range.</p>
               ) : (
                 <div className="space-y-2">
-                  {/* Fully available slots (green) */}
-                  {fullyAvailable.map((slot) => {
+                  {slots.map((slot) => {
                     const isFinalized =
                       meeting.finalizedStart &&
                       slot.start.toISOString() === new Date(meeting.finalizedStart).toISOString();
 
+                    const isFullyAvailable =
+                      slot.availableCount === slot.totalRequired && slot.totalRequired > 0;
+
+                    let borderClass: string;
+                    if (isFinalized) {
+                      borderClass = "border-2 border-primary bg-primary-50";
+                    } else if (isFullyAvailable) {
+                      borderClass = "border-2 border-green-300 bg-green-50";
+                    } else if (slot.availableCount > 0) {
+                      borderClass = "border border-amber-200 bg-amber-50";
+                    } else {
+                      borderClass = "border border-stone-200 bg-stone-50";
+                    }
+
+                    const countColorClass = isFullyAvailable
+                      ? "text-green-700"
+                      : slot.availableCount > 0
+                        ? "text-amber-700"
+                        : "text-stone-400";
+
                     return (
                       <div
                         key={slot.start.toISOString()}
-                        className={`flex items-center justify-between p-3 rounded-lg border-2 ${
-                          isFinalized
-                            ? "border-primary bg-primary-50"
-                            : "border-green-300 bg-green-50"
-                        }`}
+                        className={`flex items-center justify-between p-3 rounded-lg ${borderClass}`}
                       >
                         <div>
                           <span className="text-sm font-medium text-stone-900">
                             {format(slot.start, "h:mm a")} &mdash; {format(slot.end, "h:mm a")}
                           </span>
-                          <span className="ml-2 text-xs text-green-700 font-medium">
+                          <span className={`ml-2 text-xs font-medium ${countColorClass}`}>
                             {slot.availableCount}/{slot.totalRequired} required available
                           </span>
                         </div>
@@ -396,60 +424,25 @@ export default function MeetingDetail() {
                               Confirmed
                             </span>
                           )}
-                          {meeting.status === "ACTIVE" && allRequiredVoted && !isFinalized && (
+                          {meeting.status === "ACTIVE" && !isFinalized && (
                             <button
-                              onClick={() => finalize(slot.start, slot.end)}
-                              disabled={finalizing}
-                              className="flex items-center gap-1.5 bg-primary text-white px-3 py-1.5 rounded-lg hover:bg-primary-dark transition-colors text-sm font-medium disabled:opacity-50"
+                              onClick={() => setScheduleSlot({ start: slot.start, end: slot.end })}
+                              className="flex items-center gap-1.5 bg-primary text-white px-3 py-1.5 rounded-lg hover:bg-primary-dark transition-colors text-sm font-medium"
                             >
                               <Calendar className="w-3.5 h-3.5" />
-                              {finalizing ? "..." : "Confirm"}
+                              Schedule
                             </button>
                           )}
                         </div>
                       </div>
                     );
                   })}
-
-                  {/* Partial slots (yellow) */}
-                  {partialSlots.map((slot) => (
-                    <div
-                      key={slot.start.toISOString()}
-                      className="flex items-center justify-between p-3 rounded-lg border border-amber-200 bg-amber-50"
-                    >
-                      <div>
-                        <span className="text-sm font-medium text-stone-900">
-                          {format(slot.start, "h:mm a")} &mdash; {format(slot.end, "h:mm a")}
-                        </span>
-                        <span className="ml-2 text-xs text-amber-700 font-medium">
-                          {slot.availableCount}/{slot.totalRequired} required available
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-
-                  {fullyAvailable.length === 0 && partialSlots.length === 0 && (
-                    <p className="text-sm text-stone-400 italic">
-                      No participants have marked availability in this range yet.
-                    </p>
-                  )}
                 </div>
               )}
             </div>
           );
         })}
 
-        {meeting.status === "ACTIVE" && allRequiredVoted && (
-          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <p className="text-sm text-amber-800">
-              {Array.from(slotData.values()).some((slots) =>
-                slots.some((s) => s.availableCount === s.totalRequired && s.totalRequired > 0)
-              )
-                ? "All required participants have voted. Choose a slot to confirm the meeting."
-                : "All required participants have voted, but no slot works for everyone. Consider adding more availability ranges."}
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Additional context */}
@@ -480,6 +473,19 @@ export default function MeetingDetail() {
             />
           )}
         </div>
+      )}
+
+      {scheduleSlot && (
+        <ScheduleModal
+          meetingTitle={meeting.title}
+          meetingDescription={meeting.description}
+          slotStart={scheduleSlot.start}
+          slotEnd={scheduleSlot.end}
+          attendees={meeting.participants.map((p) => p.email)}
+          organizerEmail={meeting.creator.email}
+          onConfirm={finalize}
+          onClose={() => setScheduleSlot(null)}
+        />
       )}
     </div>
   );

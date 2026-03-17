@@ -71,6 +71,7 @@ model Meeting {
   participants      Participant[]
   finalizedStart    DateTime?
   finalizedEnd      DateTime?
+  finalizedAttendees String[]
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 }
