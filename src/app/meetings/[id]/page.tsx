@@ -18,6 +18,7 @@ import {
   Ban,
   Trash2,
   Pencil,
+  Vote,
 } from "lucide-react";
 import { generateSlotStarts } from "@/lib/time-slots";
 import DismissButton from "@/components/dismiss-button";
@@ -84,12 +85,17 @@ export default function MeetingDetail() {
   const [copied, setCopied] = useState(false);
   const [scheduleSlot, setScheduleSlot] = useState<{ start: Date; end: Date } | null>(null);
   const [sendingInvites, setSendingInvites] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/meetings/${id}`)
       .then((r) => r.json())
       .then(setMeeting)
       .finally(() => setLoading(false));
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((s) => setCurrentUserEmail(s?.user?.email?.toLowerCase() || null))
+      .catch(() => {});
   }, [id]);
 
   const slotData = useMemo(() => {
@@ -258,14 +264,28 @@ export default function MeetingDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Link
-              href={`/meetings/${meeting.id}/edit`}
-              className="flex items-center gap-1.5 text-sm text-stone-400 hover:text-primary transition-colors px-3 py-1.5 rounded-lg hover:bg-primary-50"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              Edit
-            </Link>
-            <DismissButton meetingId={meeting.id} meetingTitle={meeting.title} variant="text" />
+            {currentUserEmail && currentUserEmail !== meeting.creator.email.toLowerCase() ? (
+              meeting.status === "ACTIVE" && (
+                <Link
+                  href={`/vote/${meeting.shareToken}`}
+                  className="flex items-center gap-1.5 text-sm text-white bg-primary px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors font-medium"
+                >
+                  <Vote className="w-4 h-4" />
+                  Vote
+                </Link>
+              )
+            ) : (
+              <>
+                <Link
+                  href={`/meetings/${meeting.id}/edit`}
+                  className="flex items-center gap-1.5 text-sm text-stone-400 hover:text-primary transition-colors px-3 py-1.5 rounded-lg hover:bg-primary-50"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Edit
+                </Link>
+                <DismissButton meetingId={meeting.id} meetingTitle={meeting.title} variant="text" />
+              </>
+            )}
           </div>
         </div>
 

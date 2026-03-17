@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { Calendar, Plus, Users, Clock, CheckCircle2, XCircle, Pencil } from "lucide-react";
+import { Calendar, Plus, Users, Clock, CheckCircle2, XCircle, Pencil, Vote } from "lucide-react";
 import DismissButton from "@/components/dismiss-button";
 
 export default async function Home() {
@@ -99,6 +99,7 @@ function MeetingCard({
     description: string | null;
     duration: number;
     status: string;
+    shareToken: string;
     timeOptions: { id: string }[];
     participants: { type: string; hasVoted: boolean }[];
   };
@@ -144,18 +145,30 @@ function MeetingCard({
             </span>
           </div>
         </div>
-        {isOrganizer && (
-          <div className="relative z-10 flex items-center gap-2">
-            <Link
-              href={`/meetings/${meeting.id}/edit`}
-              className="flex items-center gap-1.5 text-sm text-stone-400 hover:text-primary transition-colors px-3 py-1.5 rounded-lg hover:bg-primary-50"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              Edit
-            </Link>
-            <DismissButton meetingId={meeting.id} meetingTitle={meeting.title} variant="text" />
-          </div>
-        )}
+        <div className="relative z-10 flex items-center gap-2">
+          {isOrganizer ? (
+            <>
+              <Link
+                href={`/meetings/${meeting.id}/edit`}
+                className="flex items-center gap-1.5 text-sm text-stone-400 hover:text-primary transition-colors px-3 py-1.5 rounded-lg hover:bg-primary-50"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                Edit
+              </Link>
+              <DismissButton meetingId={meeting.id} meetingTitle={meeting.title} variant="text" />
+            </>
+          ) : (
+            meeting.status === "ACTIVE" && (
+              <Link
+                href={`/vote/${meeting.shareToken}`}
+                className="flex items-center gap-1.5 text-sm text-white bg-primary px-3 py-1.5 rounded-lg hover:bg-primary-dark transition-colors font-medium"
+              >
+                <Vote className="w-3.5 h-3.5" />
+                Vote
+              </Link>
+            )
+          )}
+        </div>
       </div>
     </div>
   );
